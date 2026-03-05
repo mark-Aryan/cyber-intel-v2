@@ -4,7 +4,8 @@
   "builds": [
     {
       "src": "api/index.py",
-      "use": "@vercel/python"
+      "use": "@vercel/python",
+      "config": { "maxLambdaSize": "15mb" }
     },
     {
       "src": "public/**",
@@ -21,9 +22,9 @@
     {
       "source": "/api/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options",        "value": "DENY"    },
-        { "key": "X-XSS-Protection",       "value": "1; mode=block" }
+        { "key": "X-Content-Type-Options", "value": "nosniff"      },
+        { "key": "X-Frame-Options",        "value": "DENY"         },
+        { "key": "X-XSS-Protection",       "value": "1; mode=block"}
       ]
     }
   ]
