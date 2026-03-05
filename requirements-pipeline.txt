@@ -12,8 +12,15 @@ requests==2.31.0
 feedparser==6.0.11
 
 # AI SDKs
-google-generativeai==0.7.2
+google-generativeai==0.8.3
 groq==0.9.0
+
+# HuggingFace — NEW Inference Providers SDK (replaces raw httpx image calls)
+# AsyncInferenceClient.text_to_image() is the correct 2026 API for FLUX etc.
+huggingface_hub>=0.28.0
+
+# Image processing — required to convert PIL.Image → PNG bytes
+Pillow>=10.0.0
 
 # Utilities
 python-dateutil==2.9.0
