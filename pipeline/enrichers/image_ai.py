@@ -1,14 +1,19 @@
 """
 pipeline/enrichers/image_ai.py
 ================================
-Generates cybersecurity-themed images via Hugging Face Inference API
-(Stable Diffusion 2.1 — free tier, ~1,000 req/day).
+Generates cybersecurity-themed images via Hugging Face Inference API.
 
-Key difference from the Vercel version:
-  - GitHub Actions has no 10-second timeout, so we use a 30-second
-    client timeout and allow the model warm-up wait.
-  - We try the primary model, fall back to the secondary, then return
-    a category-specific SVG placeholder path on total failure.
+FIX (2026): Both previous models returned 410 Gone (permanently removed):
+  ✗ stabilityai/stable-diffusion-2-1   → 410 Gone
+  ✗ runwayml/stable-diffusion-v1-5     → 410 Gone
+
+Replacement models (confirmed working, free tier):
+  ✓ PRIMARY:  black-forest-labs/FLUX.1-schnell  (fast, high quality, free)
+  ✓ FALLBACK: stabilityai/stable-diffusion-xl-base-1.0  (SDXL, free tier)
+  ✓ FALLBACK2: prashanth970/flux-lora-uncensored (tiny FLUX variant, free)
+
+FLUX.1-schnell uses a different payload format — it does NOT accept
+"negative_prompt" or "guidance_scale". We handle both formats below.
 """
 
 from __future__ import annotations
@@ -24,10 +29,16 @@ from pipeline.utils.helpers import get_logger
 
 log = get_logger(__name__)
 
-HF_URL          = "https://api-inference.huggingface.co/models/{model}"
-PRIMARY_MODEL   = "stabilityai/stable-diffusion-2-1"
-FALLBACK_MODEL  = "runwayml/stable-diffusion-v1-5"
-IMAGE_TIMEOUT   = 30.0   # GitHub Actions can afford to wait longer
+HF_URL         = "https://api-inference.huggingface.co/models/{model}"
+IMAGE_TIMEOUT  = 60.0   # FLUX can take up to 45s on cold start
+
+# Model list — tried in order until one succeeds
+# Each entry: (model_id, supports_negative_prompt)
+MODELS = [
+    ("black-forest-labs/FLUX.1-schnell",             False),  # PRIMARY — fast & free
+    ("stabilityai/stable-diffusion-xl-base-1.0",     True),   # FALLBACK — SDXL
+    ("stabilityai/stable-diffusion-3-medium-diffusers", False), # FALLBACK2
+]
 
 NEGATIVE_PROMPT = (
     "text, words, watermark, logo, nsfw, cartoon, anime, "
@@ -64,13 +75,14 @@ async def generate_and_upload_image(
     full_prompt = _build_prompt(image_prompt, category)
     image_bytes: bytes | None = None
 
-    for model in (PRIMARY_MODEL, FALLBACK_MODEL):
+    for model_id, supports_neg in MODELS:
         try:
-            image_bytes = await _call_hf(full_prompt, model, hf_token)
+            image_bytes = await _call_hf(full_prompt, model_id, hf_token, supports_neg)
             if image_bytes:
+                log.info("[image_ai] Success with model '%s' for '%s'", model_id, item_id)
                 break
         except Exception as exc:
-            log.warning("[image_ai] Model '%s' failed for '%s': %s", model, item_id, exc)
+            log.warning("[image_ai] Model '%s' failed for '%s': %s", model_id, item_id, exc)
 
     if not image_bytes:
         log.warning("[image_ai] All models failed for '%s' — using placeholder", item_id)
@@ -85,33 +97,56 @@ async def generate_and_upload_image(
         return FALLBACK_IMAGES.get(category, "/placeholders/news.svg")
 
 
-@retry(stop=stop_after_attempt(2), wait=wait_exponential(min=3, max=10), reraise=True)
-async def _call_hf(prompt: str, model: str, token: str) -> bytes:
+@retry(stop=stop_after_attempt(2), wait=wait_exponential(min=5, max=15), reraise=True)
+async def _call_hf(prompt: str, model: str, token: str, supports_negative: bool) -> bytes:
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type":  "application/json",
     }
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "negative_prompt":     NEGATIVE_PROMPT,
-            "num_inference_steps": 25,
-            "guidance_scale":      7.5,
-            "width":               512,
-            "height":              512,
-        },
-        "options": {"wait_for_model": True, "use_cache": False},
-    }
+
+    # FLUX.1-schnell and newer models use a simpler payload
+    if supports_negative:
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "negative_prompt":     NEGATIVE_PROMPT,
+                "num_inference_steps": 25,
+                "guidance_scale":      7.5,
+                "width":               512,
+                "height":              512,
+            },
+            "options": {"wait_for_model": True, "use_cache": False},
+        }
+    else:
+        # FLUX format — minimal params only
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "num_inference_steps": 4,   # FLUX.1-schnell is optimised for 1-4 steps
+                "width":               512,
+                "height":              512,
+            },
+            "options": {"wait_for_model": True, "use_cache": False},
+        }
+
     async with httpx.AsyncClient(timeout=IMAGE_TIMEOUT) as client:
         r = await client.post(HF_URL.format(model=model), headers=headers, json=payload)
         if r.status_code == 503:
             wait = r.json().get("estimated_time", "?")
-            raise RuntimeError(f"Model cold-starting, wait={wait}s")
+            raise RuntimeError(f"Model cold-starting, estimated wait={wait}s")
+        if r.status_code == 410:
+            raise RuntimeError(f"Model '{model}' has been removed from HuggingFace (410 Gone)")
         r.raise_for_status()
+
+        # Validate we got image bytes, not a JSON error
+        content_type = r.headers.get("content-type", "")
+        if "image" not in content_type and "octet-stream" not in content_type:
+            raise RuntimeError(f"Unexpected content-type '{content_type}': {r.text[:200]}")
+
         return r.content
 
 
 def _build_prompt(raw: str, category: str) -> str:
     prefix = CATEGORY_PREFIXES.get(category, "cybersecurity concept art,")
-    suffix = ", cinematic lighting, dark moody atmosphere, ultra-detailed, 4k"
+    suffix = ", cinematic lighting, dark moody atmosphere, ultra-detailed, 4k, no text, no people"
     return f"{prefix} {raw}{suffix}"
