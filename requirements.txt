@@ -1,9 +1,10 @@
 # ============================================================
-# requirements.txt — Vercel serverless API dependencies ONLY
-# This file is intentionally minimal — the Vercel function
-# only reads from Blob, so it needs very few packages.
+# requirements.txt — Vercel serverless API dependencies
+#
+# FIX (2026): Removed fastapi, mangum, httpx.
+# Vercel's @vercel/python runtime requires BaseHTTPRequestHandler.
+# FastAPI + Mangum causes: TypeError: issubclass() arg 1 must be a class
+#
+# The new api/index.py uses stdlib only (urllib, http.server, json)
+# so NO extra packages are needed at all.
 # ============================================================
-
-fastapi==0.111.0
-mangum==0.17.0
-httpx==0.27.0
