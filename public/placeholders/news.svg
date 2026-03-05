@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 200"><rect width="512" height="200" fill="#060d1a"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0f172a"/>
+  <rect x="60" y="80" width="392" height="280" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <rect x="80" y="100" width="240" height="16" rx="4" fill="#475569"/>
+  <rect x="80" y="128" width="352" height="10" rx="3" fill="#334155"/>
+  <rect x="80" y="148" width="320" height="10" rx="3" fill="#334155"/>
+  <rect x="80" y="168" width="280" height="10" rx="3" fill="#334155"/>
+  <rect x="80" y="200" width="160" height="120" rx="6" fill="#1e3a5f" stroke="#2563eb" stroke-width="1"/>
+  <circle cx="160" cy="260" r="30" fill="#1d4ed8" opacity="0.6"/>
+  <path d="M145 260 L160 240 L175 260 L165 260 L165 280 L155 280 L155 260 Z" fill="#60a5fa"/>
+  <rect x="260" y="200" width="172" height="55" rx="4" fill="#334155"/>
+  <rect x="260" y="265" width="172" height="55" rx="4" fill="#334155"/>
+  <rect x="80" y="340" width="200" height="10" rx="3" fill="#1e40af" opacity="0.8"/>
+  <text x="256" y="420" font-family="monospace" font-size="18" fill="#64748b" text-anchor="middle">CYBER NEWS</text>
+  <text x="256" y="445" font-family="monospace" font-size="11" fill="#334155" text-anchor="middle">cyberintel hub</text>
+</svg>
