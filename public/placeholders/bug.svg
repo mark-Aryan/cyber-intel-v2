@@ -1,1 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 200"><rect width="512" height="200" fill="#060d1a"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0f0a00"/>
+  <rect x="60" y="60" width="392" height="392" rx="12" fill="#1c1000" stroke="#d97706" stroke-width="2"/>
+  <!-- Terminal window -->
+  <rect x="100" y="110" width="312" height="220" rx="6" fill="#0d0d0d" stroke="#d97706" stroke-width="1.5"/>
+  <!-- Title bar -->
+  <rect x="100" y="110" width="312" height="28" rx="6" fill="#1c1000"/>
+  <circle cx="122" cy="124" r="6" fill="#ef4444"/>
+  <circle cx="142" cy="124" r="6" fill="#d97706"/>
+  <circle cx="162" cy="124" r="6" fill="#16a34a"/>
+  <!-- Code lines -->
+  <rect x="115" y="152" width="60" height="8" rx="2" fill="#d97706" opacity="0.9"/>
+  <rect x="182" y="152" width="100" height="8" rx="2" fill="#64748b" opacity="0.7"/>
+  <rect x="115" y="170" width="40" height="8" rx="2" fill="#7c3aed" opacity="0.8"/>
+  <rect x="162" y="170" width="140" height="8" rx="2" fill="#64748b" opacity="0.6"/>
+  <rect x="115" y="188" width="80" height="8" rx="2" fill="#ef4444" opacity="0.9"/>
+  <rect x="202" y="188" width="90" height="8" rx="2" fill="#64748b" opacity="0.6"/>
+  <!-- Error line highlight -->
+  <rect x="108" y="208" width="296" height="20" rx="2" fill="#7f1d1d" opacity="0.6"/>
+  <rect x="115" y="212" width="180" height="8" rx="2" fill="#fca5a5"/>
+  <!-- Bug icon -->
+  <text x="256" y="305" font-family="monospace" font-size="40" fill="#d97706" text-anchor="middle">🐛</text>
+  <!-- Scan line animation suggestion -->
+  <rect x="100" y="245" width="312" height="2" fill="#d97706" opacity="0.15"/>
+  <text x="256" y="370" font-family="monospace" font-size="13" fill="#d97706" text-anchor="middle">ERROR: SEGFAULT 0x00000000</text>
+  <text x="256" y="455" font-family="monospace" font-size="16" fill="#d97706" text-anchor="middle">BUG REPORT</text>
+  <text x="256" y="475" font-family="monospace" font-size="10" fill="#92400e" text-anchor="middle">cyberintel hub</text>
+</svg>

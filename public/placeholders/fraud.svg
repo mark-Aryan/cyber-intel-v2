@@ -1,1 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 200"><rect width="512" height="200" fill="#060d1a"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0a0f0a"/>
+  <rect x="60" y="60" width="392" height="392" rx="12" fill="#0a1a0e" stroke="#16a34a" stroke-width="2"/>
+  <!-- Web/network nodes -->
+  <circle cx="256" cy="256" r="28" fill="#14532d" stroke="#16a34a" stroke-width="2"/>
+  <circle cx="140" cy="180" r="16" fill="#14532d" stroke="#16a34a" stroke-width="1.5"/>
+  <circle cx="370" cy="180" r="16" fill="#14532d" stroke="#16a34a" stroke-width="1.5"/>
+  <circle cx="140" cy="330" r="16" fill="#14532d" stroke="#16a34a" stroke-width="1.5"/>
+  <circle cx="370" cy="330" r="16" fill="#14532d" stroke="#16a34a" stroke-width="1.5"/>
+  <circle cx="256" cy="140" r="12" fill="#991b1b" stroke="#ef4444" stroke-width="1.5"/>
+  <!-- Connecting lines -->
+  <line x1="256" y1="228" x2="140" y2="196" stroke="#16a34a" stroke-width="1" opacity="0.6"/>
+  <line x1="256" y1="228" x2="370" y2="196" stroke="#16a34a" stroke-width="1" opacity="0.6"/>
+  <line x1="256" y1="284" x2="140" y2="314" stroke="#16a34a" stroke-width="1" opacity="0.6"/>
+  <line x1="256" y1="284" x2="370" y2="314" stroke="#16a34a" stroke-width="1" opacity="0.6"/>
+  <line x1="256" y1="228" x2="256" y2="152" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <!-- Hook symbol in center -->
+  <text x="256" y="264" font-family="monospace" font-size="22" fill="#4ade80" text-anchor="middle">⚠</text>
+  <!-- Dollar/fraud indicator -->
+  <text x="256" y="135" font-family="monospace" font-size="14" fill="#ef4444" text-anchor="middle">!</text>
+  <text x="256" y="455" font-family="monospace" font-size="16" fill="#16a34a" text-anchor="middle">FRAUD ALERT</text>
+  <text x="256" y="475" font-family="monospace" font-size="10" fill="#14532d" text-anchor="middle">cyberintel hub</text>
+</svg>
