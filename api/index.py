@@ -3,122 +3,122 @@ api/index.py
 ============
 Vercel serverless function — READ-ONLY public API.
 
-This is deliberately minimal: it has exactly ONE job — read data.json from
-Vercel Blob and serve it to the frontend. ALL the heavy lifting (fetching,
-AI enrichment, storage writes) now happens in GitHub Actions.
+FIX (2026): Vercel's @vercel/python runtime requires a plain
+BaseHTTPRequestHandler subclass. FastAPI + Mangum causes:
+  TypeError: issubclass() arg 1 must be a class
+This version uses stdlib http.server only — zero extra dependencies.
 
 Endpoints:
-  GET /api/data    → Full data.json (cached 60s at CDN edge)
+  GET /api/data    → Full data.json (CDN cached 60s)
   GET /api/health  → Item counts + last-modified timestamp
-
-Because this endpoint only does a single Blob GET request, it will complete
-well within Vercel's 10-second timeout on the free Hobby plan.
 """
 
 from __future__ import annotations
 
+import json
 import os
+import urllib.request
+import urllib.error
 from datetime import datetime, timezone
-from typing import Any
-
-import httpx
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from mangum import Mangum
-
-# ── App setup ──────────────────────────────────────────────────────────────────
-
-app = FastAPI(
-    title="CyberIntel Hub — Public API",
-    version="2.0.0",
-    docs_url="/api/docs",
-    redoc_url=None,
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["GET"],
-    allow_headers=["*"],
-)
-
-handler = Mangum(app, lifespan="off")
-
-BLOB_API  = "https://blob.vercel-storage.com"
-TIMEOUT   = 8.0
+from http.server import BaseHTTPRequestHandler
 
 
-# ── Endpoints ──────────────────────────────────────────────────────────────────
-
-@app.get("/api/data")
-async def get_data() -> JSONResponse:
-    """
-    Serve the master intelligence feed to the frontend.
-    CDN cache: 60s fresh, 120s stale-while-revalidate.
-    """
-    try:
-        data = await _load_data_json()
-        return JSONResponse(
-            content=data,
-            headers={
-                "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
-                "X-Content-Type-Options": "nosniff",
-            },
-        )
-    except EnvironmentError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to load data: {exc}")
+BLOB_API = "https://blob.vercel-storage.com"
+TIMEOUT  = 8
 
 
-@app.get("/api/health")
-async def health() -> dict[str, Any]:
-    """Lightweight health check — returns item counts."""
-    try:
-        data = await _load_data_json()
-        counts = {k: len(v) for k, v in data.items() if isinstance(v, list)}
-        return {
-            "status":    "ok",
-            "counts":    counts,
-            "total":     sum(counts.values()),
-            "timestamp": datetime.now(tz=timezone.utc).isoformat(),
-        }
-    except Exception as exc:
-        return {"status": "degraded", "error": str(exc)}
+class handler(BaseHTTPRequestHandler):
 
+    def do_GET(self):  # noqa: N802
+        path = self.path.split("?")[0].rstrip("/")
 
-# ── Blob reader ────────────────────────────────────────────────────────────────
+        if path == "/api/data":
+            self._serve_data()
+        elif path == "/api/health":
+            self._serve_health()
+        else:
+            self._send_json({"error": "Not found"}, status=404)
 
-async def _load_data_json() -> dict[str, Any]:
-    token = os.getenv("BLOB_READ_WRITE_TOKEN")
-    if not token:
-        raise EnvironmentError(
-            "BLOB_READ_WRITE_TOKEN is not configured in Vercel environment variables."
-        )
+    # ── Endpoints ────────────────────────────────────────────────────────
 
-    # Step 1: Find the CDN URL for data.json
-    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-        list_r = await client.get(
-            f"{BLOB_API}?prefix=data.json&limit=1",
+    def _serve_data(self):
+        try:
+            data = self._load_data_json()
+            self._send_json(
+                data,
+                extra_headers={
+                    "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+                    "X-Content-Type-Options": "nosniff",
+                },
+            )
+        except EnvironmentError as exc:
+            self._send_json({"error": str(exc)}, status=503)
+        except Exception as exc:
+            self._send_json({"error": f"Failed to load data: {exc}"}, status=500)
+
+    def _serve_health(self):
+        try:
+            data = self._load_data_json()
+            counts = {k: len(v) for k, v in data.items() if isinstance(v, list)}
+            self._send_json({
+                "status":    "ok",
+                "counts":    counts,
+                "total":     sum(counts.values()),
+                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+            })
+        except Exception as exc:
+            self._send_json({"status": "degraded", "error": str(exc)})
+
+    # ── Blob reader ──────────────────────────────────────────────────────
+
+    def _load_data_json(self) -> dict:
+        token = os.environ.get("BLOB_READ_WRITE_TOKEN", "").strip()
+        if not token:
+            raise EnvironmentError(
+                "BLOB_READ_WRITE_TOKEN is not configured in Vercel environment variables."
+            )
+
+        # Step 1: Find the CDN URL for data.json
+        list_url = f"{BLOB_API}?prefix=data.json&limit=1"
+        req = urllib.request.Request(
+            list_url,
             headers={"Authorization": f"Bearer {token}"},
         )
-        if list_r.status_code == 404:
-            return _scaffold()
-        list_r.raise_for_status()
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+                body = json.loads(resp.read().decode())
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                return self._scaffold()
+            raise
 
-        blobs = list_r.json().get("blobs", [])
+        blobs = body.get("blobs", [])
         if not blobs:
-            return _scaffold()
+            return self._scaffold()
 
         cdn_url = blobs[0]["url"]
 
-    # Step 2: Fetch the actual JSON content from CDN
-    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-        data_r = await client.get(cdn_url)
-        data_r.raise_for_status()
-        return data_r.json()
+        # Step 2: Fetch actual JSON from CDN
+        with urllib.request.urlopen(cdn_url, timeout=TIMEOUT) as resp:
+            return json.loads(resp.read().decode())
 
+    # ── Helpers ──────────────────────────────────────────────────────────
 
-def _scaffold() -> dict[str, list]:
-    return {"news": [], "vulnerability": [], "fraud": [], "bug": []}
+    def _send_json(self, data: dict, status: int = 200, extra_headers: dict = None):
+        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        if extra_headers:
+            for k, v in extra_headers.items():
+                self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, fmt, *args):  # suppress default stderr logging
+        pass
+
+    @staticmethod
+    def _scaffold() -> dict:
+        return {"news": [], "vulnerability": [], "fraud": [], "bug": []}
