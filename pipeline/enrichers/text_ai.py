@@ -1,25 +1,11 @@
 """
 pipeline/enrichers/text_ai.py
 ==============================
-AI text enrichment: Google Gemini 1.5 Flash (primary) → Groq Llama-3 (fallback).
+AI text enrichment: Google Gemini 2.0 Flash (primary) → Groq Llama-3 (fallback).
 
-GitHub Actions has NO 10-second timeout, so we can use higher token limits
-and more retries than the previous Vercel-constrained version.
-
-Output structure (enforced via JSON mode):
-  {
-    "In-Depth Detail": {
-      "executive_summary":      str,
-      "technical_analysis":     str,
-      "impact":                 str,
-      "root_cause":             str,
-      "mitigation":             str,
-      "severity_rating":        CRITICAL|HIGH|MEDIUM|LOW|INFORMATIONAL,
-      "affected_technologies":  [str, ...],
-      "ioc_keywords":           [str, ...]
-    },
-    "image_prompt": str   (passed to image_ai.py, removed from final output)
-  }
+FIX (2026):
+  - gemini-1.5-flash was renamed/removed → use gemini-2.0-flash
+  - Groq model updated to llama-3.3-70b-versatile (higher quality, still free)
 """
 
 from __future__ import annotations
@@ -36,9 +22,9 @@ from pipeline.utils.helpers import get_logger
 
 log = get_logger(__name__)
 
-GEMINI_MODEL = "gemini-1.5-flash"
-GROQ_MODEL   = "llama3-8b-8192"
-MAX_TOKENS   = 700    # Increased vs Vercel version — no 10s constraint here
+GEMINI_MODEL = "gemini-2.0-flash"          # ← FIXED: was gemini-1.5-flash
+GROQ_MODEL   = "llama-3.3-70b-versatile"   # ← FIXED: was llama3-8b-8192
+MAX_TOKENS   = 700
 
 PROMPT_TEMPLATE = """
 You are a senior cybersecurity analyst. Analyse the following item and respond with ONLY a valid JSON object — no markdown fences, no preamble, no trailing text.
@@ -66,10 +52,6 @@ Return EXACTLY this JSON structure (every field is required):
 
 
 async def enrich_item_text(item: dict[str, Any]) -> dict[str, Any]:
-    """
-    Enrich a raw fetched item with AI analysis.
-    Tries Gemini first, falls back to Groq, then uses a placeholder.
-    """
     prompt = PROMPT_TEMPLATE.format(
         category=item.get("category", "unknown"),
         source=item.get("source", "unknown"),
@@ -79,14 +61,12 @@ async def enrich_item_text(item: dict[str, Any]) -> dict[str, Any]:
 
     result: dict | None = None
 
-    # Primary: Gemini
     if os.getenv("GEMINI_API_KEY"):
         try:
             result = await _call_gemini(prompt, os.environ["GEMINI_API_KEY"])
         except Exception as exc:
             log.warning("[text_ai] Gemini failed for '%s': %s → trying Groq", item.get("id"), exc)
 
-    # Fallback: Groq
     if result is None and os.getenv("GROQ_API_KEY"):
         try:
             result = await _call_groq(prompt, os.environ["GROQ_API_KEY"])
@@ -154,7 +134,6 @@ async def _call_groq(prompt: str, api_key: str) -> dict:
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _parse_json(raw: str) -> dict:
-    """Parse AI response, stripping markdown fences if present."""
     clean = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
     clean = re.sub(r"\s*```$", "", clean.strip())
     try:
