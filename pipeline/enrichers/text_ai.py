@@ -4,8 +4,8 @@ pipeline/enrichers/text_ai.py
 AI text enrichment: Google Gemini 2.0 Flash (primary) → Groq Llama-3 (fallback).
 
 FIX (2026):
-  - gemini-1.5-flash was renamed/removed → use gemini-2.0-flash
-  - Groq model updated to llama-3.3-70b-versatile (higher quality, still free)
+  - gemini-1.5-flash → removed from v1beta API, replaced with gemini-2.0-flash
+  - groq model updated to llama-3.3-70b-versatile (llama3-8b-8192 deprecated)
 """
 
 from __future__ import annotations
@@ -16,14 +16,14 @@ import os
 import re
 from typing import Any
 
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from pipeline.utils.helpers import get_logger
 
 log = get_logger(__name__)
 
-GEMINI_MODEL = "gemini-2.0-flash"          # ← FIXED: was gemini-1.5-flash
-GROQ_MODEL   = "llama-3.3-70b-versatile"   # ← FIXED: was llama3-8b-8192
+GEMINI_MODEL = "gemini-2.0-flash"           # FIX: was gemini-1.5-flash (404)
+GROQ_MODEL   = "llama-3.3-70b-versatile"    # FIX: was llama3-8b-8192 (deprecated)
 MAX_TOKENS   = 700
 
 PROMPT_TEMPLATE = """
@@ -80,14 +80,12 @@ async def enrich_item_text(item: dict[str, Any]) -> dict[str, Any]:
     return {
         **item,
         "In-Depth Detail": result.get("In-Depth Detail", {}),
-        "image_prompt":    result.get(
+        "image_prompt": result.get(
             "image_prompt",
             f"abstract cybersecurity threat visualization dark background {item.get('category', '')}",
         ),
     }
 
-
-# ── Gemini ─────────────────────────────────────────────────────────────────────
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=8), reraise=True)
 async def _call_gemini(prompt: str, api_key: str) -> dict:
@@ -107,8 +105,6 @@ async def _call_gemini(prompt: str, api_key: str) -> dict:
 
     return _parse_json(await asyncio.to_thread(_sync))
 
-
-# ── Groq ───────────────────────────────────────────────────────────────────────
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=8), reraise=True)
 async def _call_groq(prompt: str, api_key: str) -> dict:
@@ -131,8 +127,6 @@ async def _call_groq(prompt: str, api_key: str) -> dict:
     return _parse_json(await asyncio.to_thread(_sync))
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
-
 def _parse_json(raw: str) -> dict:
     clean = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
     clean = re.sub(r"\s*```$", "", clean.strip())
@@ -148,14 +142,14 @@ def _parse_json(raw: str) -> dict:
 def _placeholder(item: dict) -> dict:
     return {
         "In-Depth Detail": {
-            "executive_summary":    item.get("raw_summary", "No summary available."),
-            "technical_analysis":   "AI enrichment temporarily unavailable.",
-            "impact":               "Unknown — please refer to the source URL.",
-            "root_cause":           "Analysis pending.",
-            "mitigation":           "Monitor the source URL for official guidance.",
-            "severity_rating":      item.get("severity", "UNKNOWN"),
+            "executive_summary":     item.get("raw_summary", "No summary available."),
+            "technical_analysis":    "AI enrichment temporarily unavailable.",
+            "impact":                "Unknown — please refer to the source URL.",
+            "root_cause":            "Analysis pending.",
+            "mitigation":            "Monitor the source URL for official guidance.",
+            "severity_rating":       item.get("severity", "UNKNOWN"),
             "affected_technologies": [],
-            "ioc_keywords":         [],
+            "ioc_keywords":          [],
         },
         "image_prompt": "cyber threat network abstract dark glowing nodes digital",
     }
