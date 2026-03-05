@@ -1,0 +1,9 @@
+# ============================================================
+# requirements.txt — Vercel serverless API dependencies ONLY
+# This file is intentionally minimal — the Vercel function
+# only reads from Blob, so it needs very few packages.
+# ============================================================
+
+fastapi==0.111.0
+mangum==0.17.0
+httpx==0.27.0

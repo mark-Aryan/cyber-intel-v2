@@ -1,0 +1,101 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# CyberIntel Hub — Automated Intelligence Pipeline
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# This workflow IS the cron engine. It replaces Vercel Cron entirely.
+#
+# Trigger schedule: Every 30 minutes, 24/7.
+#   GitHub Actions Free Tier: 2,000 minutes/month
+#   Our usage: ~1,440 runs/month × ~1 min each ≈ 1,440 min/month  ✅ SAFE
+#
+# What it does:
+#   1. Checks out the repo
+#   2. Installs Python pipeline dependencies
+#   3. Runs pipeline/run.py which:
+#        - Fetches from RSS / NVD / advisory feeds
+#        - Enriches new items with Gemini + Stable Diffusion
+#        - Uploads data.json + images to Vercel Blob
+#   4. Reports success/failure in the Actions tab
+#
+# How to set secrets (GitHub → Repo → Settings → Secrets → Actions):
+#   BLOB_READ_WRITE_TOKEN  — Vercel Blob token
+#   GEMINI_API_KEY         — Google Gemini key
+#   GROQ_API_KEY           — Groq Llama-3 fallback key
+#   HF_API_TOKEN           — Hugging Face image gen token
+#
+# ══════════════════════════════════════════════════════════════════════════════
+
+name: 🛡 CyberIntel Pipeline
+
+on:
+  # ── Automatic schedule ──────────────────────────────────────────────────
+  schedule:
+    - cron: '*/30 * * * *'   # Every 30 minutes
+
+  # ── Manual trigger from the GitHub Actions tab ─────────────────────────
+  # Useful for testing, first-run seeding, or forced refresh.
+  workflow_dispatch:
+    inputs:
+      force_refresh:
+        description: 'Force re-process all items (ignore dedup)?'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+# Only allow one pipeline run at a time — prevents race conditions
+# writing to data.json simultaneously.
+concurrency:
+  group: pipeline
+  cancel-in-progress: false   # Let the running job finish, queue the next
+
+jobs:
+  run-pipeline:
+    name: Fetch · Enrich · Store
+    runs-on: ubuntu-latest
+    timeout-minutes: 8    # Kill job if it hangs (protects free-tier minutes)
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Python setup ──────────────────────────────────────────────────
+      - name: 🐍 Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements-pipeline.txt
+
+      # ── 3. Install dependencies ──────────────────────────────────────────
+      - name: 📦 Install pipeline dependencies
+        run: pip install -r requirements-pipeline.txt
+
+      # ── 4. Run the pipeline ──────────────────────────────────────────────
+      - name: 🚀 Run intelligence pipeline
+        env:
+          # Storage — REQUIRED
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          # Text AI — at least one required
+          GEMINI_API_KEY:        ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY:          ${{ secrets.GROQ_API_KEY }}
+          # Image AI — optional (falls back to SVG placeholders)
+          HF_API_TOKEN:          ${{ secrets.HF_API_TOKEN }}
+          # Pipeline behaviour
+          FORCE_REFRESH:         ${{ github.event.inputs.force_refresh || 'false' }}
+          # Python path so pipeline/ imports resolve correctly
+          PYTHONPATH:            ${{ github.workspace }}
+        run: python pipeline/run.py
+
+      # ── 5. Upload logs as artifact (90-day retention) ────────────────────
+      - name: 📋 Upload pipeline log
+        if: always()   # Upload even on failure — essential for debugging
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-log-${{ github.run_id }}
+          path: pipeline_run.log
+          retention-days: 90
+          if-no-files-found: ignore

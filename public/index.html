@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="CyberIntel Hub — Real-time AI-powered cybersecurity intelligence" />
+  <title>CyberIntel Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="scanlines" aria-hidden="true"></div>
+<div class="grid-bg"   aria-hidden="true"></div>
+<div class="vignette"  aria-hidden="true"></div>
+
+<!-- ── HEADER ──────────────────────────────────────────────────────────── -->
+<header class="header">
+  <div class="header-inner">
+
+    <div class="brand">
+      <div class="brand-hex" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="none">
+          <polygon points="24,3 44,14 44,34 24,45 4,34 4,14"
+                   stroke="#00ff88" stroke-width="1.5" fill="rgba(0,255,136,0.04)"/>
+          <polygon points="24,10 37,17.5 37,30.5 24,38 11,30.5 11,17.5"
+                   stroke="#00ff88" stroke-width="0.75" opacity="0.4"/>
+          <circle cx="24" cy="24" r="5" fill="#00ff88" opacity="0.9"/>
+          <circle cx="24" cy="24" r="9" fill="none" stroke="#00ff88" stroke-width="0.5" opacity="0.3"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">CYBER<span>INTEL</span> HUB</div>
+        <div class="brand-sub">// LIVE THREAT INTELLIGENCE FEED</div>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="status-pill" id="status-pill">
+        <span class="dot" id="status-dot"></span>
+        <span id="status-label">INITIALISING</span>
+      </div>
+      <div class="next-refresh">
+        <span class="nr-label">NEXT SYNC</span>
+        <span id="countdown" class="nr-count">60</span>
+        <span class="nr-label">s</span>
+      </div>
+      <button class="icon-btn" id="refresh-btn" title="Force refresh">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M3.3 10a6.7 6.7 0 1 0 1.2-3.8"/>
+          <polyline points="1,4 3.3,6.2 5.6,4"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Live ticker -->
+  <div class="ticker" id="ticker" style="display:none">
+    <span class="ticker-live">LIVE</span>
+    <div class="ticker-scroll" id="ticker-scroll"></div>
+  </div>
+</header>
+
+<!-- ── STAT CARDS ───────────────────────────────────────────────────────── -->
+<section class="stats" aria-label="Intelligence summary">
+  <div class="stat" data-filter="news">
+    <div class="stat-glyph">◈</div>
+    <div class="stat-num" id="cnt-news">—</div>
+    <div class="stat-lbl">NEWS</div>
+  </div>
+  <div class="stat" data-filter="vulnerability">
+    <div class="stat-glyph">⬡</div>
+    <div class="stat-num" id="cnt-vulnerability">—</div>
+    <div class="stat-lbl">CVEs</div>
+  </div>
+  <div class="stat" data-filter="fraud">
+    <div class="stat-glyph">◆</div>
+    <div class="stat-num" id="cnt-fraud">—</div>
+    <div class="stat-lbl">FRAUD</div>
+  </div>
+  <div class="stat" data-filter="bug">
+    <div class="stat-glyph">▣</div>
+    <div class="stat-num" id="cnt-bug">—</div>
+    <div class="stat-lbl">BUGS</div>
+  </div>
+  <div class="stat stat-total">
+    <div class="stat-glyph">⬟</div>
+    <div class="stat-num" id="cnt-total">—</div>
+    <div class="stat-lbl">TOTAL</div>
+  </div>
+</section>
+
+<!-- ── FILTER TABS ──────────────────────────────────────────────────────── -->
+<nav class="tabs" role="tablist">
+  <button class="tab active" data-tab="all"           role="tab">ALL</button>
+  <button class="tab"        data-tab="news"          role="tab">CYBER NEWS</button>
+  <button class="tab"        data-tab="vulnerability" role="tab">VULNERABILITIES</button>
+  <button class="tab"        data-tab="fraud"         role="tab">FRAUD</button>
+  <button class="tab"        data-tab="bug"           role="tab">BUG ADVISORIES</button>
+</nav>
+
+<!-- ── MAIN CONTENT ─────────────────────────────────────────────────────── -->
+<main id="main">
+  <div class="state-loading" id="state-loading">
+    <div class="spinner"></div>
+    <p>FETCHING INTELLIGENCE DATA<span class="blink">_</span></p>
+  </div>
+
+  <div class="state-error" id="state-error" style="display:none">
+    <div class="err-icon">⚡</div>
+    <h2>CONNECTION FAILURE</h2>
+    <p id="err-msg">Unable to reach the intelligence backend.</p>
+    <button class="btn-retry" id="err-retry">↺  RETRY</button>
+  </div>
+
+  <div class="state-empty" id="state-empty" style="display:none">
+    <p>// PIPELINE INITIALISING — NO INTELLIGENCE DATA YET</p>
+    <p class="dim">The GitHub Actions pipeline will populate data on its first run.</p>
+  </div>
+
+  <div class="grid" id="grid" style="display:none"></div>
+</main>
+
+<!-- ── DETAIL MODAL ─────────────────────────────────────────────────────── -->
+<div class="modal-bg" id="modal-bg" aria-hidden="true">
+  <article class="modal" id="modal" role="dialog" aria-modal="true">
+    <button class="modal-x" id="modal-x">✕</button>
+    <div id="modal-body"></div>
+  </article>
+</div>
+
+<footer class="footer">
+  <span>CyberIntel Hub v2.0 — Powered by Gemini × Stable Diffusion × NIST NVD</span>
+  <span class="dim">Pipeline runs every 30 min via GitHub Actions · Frontend polls every 60s</span>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

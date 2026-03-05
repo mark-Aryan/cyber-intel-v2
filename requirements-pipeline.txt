@@ -1,0 +1,22 @@
+# ============================================================
+# requirements-pipeline.txt
+# Dependencies for the GitHub Actions pipeline runner ONLY.
+# NOT used by Vercel (which has its own requirements.txt).
+# ============================================================
+
+# HTTP
+httpx==0.27.0
+requests==2.31.0
+
+# RSS parsing
+feedparser==6.0.11
+
+# AI SDKs
+google-generativeai==0.7.2
+groq==0.9.0
+
+# Utilities
+python-dateutil==2.9.0
+pytz==2024.1
+tenacity==8.3.0
+python-dotenv==1.0.1
